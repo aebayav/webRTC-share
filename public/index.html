@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Viewer | Live</title>
+    <style>
+        :root {
+            --discord-dark: #36393f;
+            --discord-darker: #2f3136;
+            --discord-blurple: #5865f2;
+            --discord-red: #ed4245;
+            --text-gray: #b9bbbe;
+        }
+
+        body {
+            background-color: var(--discord-darker);
+            color: white;
+            font-family: 'Whitney', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* Giriş Paneli */
+        .setup-container {
+            background: var(--discord-dark);
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            text-align: center;
+            width: 320px;
+        }
+
+        h2 { margin-bottom: 20px; font-size: 24px; }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            border: none;
+            background: #202225;
+            color: white;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        #join-btn { background-color: var(--discord-blurple); color: white; }
+        #join-btn:hover { background-color: #4752c4; }
+
+        /* Video Alanı */
+        .video-wrapper {
+            display: none; /* Başlangıçta gizli */
+            flex-direction: column;
+            align-items: center;
+            width: 95%;
+            max-width: 1100px;
+        }
+
+        .status-bar {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px 8px 0 0;
+            font-size: 14px;
+        }
+
+        .live-indicator { color: var(--discord-red); font-weight: bold; }
+
+        video {
+            width: 100%;
+            background: #000;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+        }
+
+        #leave-btn {
+            background-color: var(--discord-red);
+            color: white;
+            width: auto;
+            padding: 10px 30px;
+        }
+
+        #leave-btn:hover { background-color: #c03537; }
+    </style>
+</head>
+<body>
+
+    <div id="setup" class="setup-container">
+        <h2>Yayına Katıl</h2>
+        <input type="text" id="room-input" placeholder="Oda ID'sini girin...">
+        <button id="join-btn">KATIL</button>
+    </div>
+
+    <div id="video-area" class="video-wrapper">
+        <div class="status-bar">
+            <span id="status-text">Bağlanıyor...</span>
+            <span class="live-indicator">● CANLI</span>
+        </div>
+        <video id="remote-video" autoplay playsinline muted></video>
+        <div class="controls">
+            <button id="leave-btn">AYRIL</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
+
+    <script>
+        const socket = io('https://wavingly-nonedified-kamden.ngrok-free.dev', {
+            extraHeaders: { "ngrok-skip-browser-warning": "true" },
+            transports: ['polling', 'websocket']
+        });
+
+        let peer;
+        let currentRoomId;
+
+        const setupDiv = document.getElementById('setup');
+        const videoArea = document.getElementById('video-area');
+        const statusText = document.getElementById('status-text');
+
+        // KATILMA MANTIĞI
+        document.getElementById('join-btn').onclick = () => {
+            currentRoomId = document.getElementById('room-input').value;
+            if (!currentRoomId) return alert("Oda ID gerekli!");
+
+            socket.emit('join-room', currentRoomId);
+            setupDiv.style.display = 'none';
+            videoArea.style.display = 'flex';
+        };
+
+        // AYRILMA MANTIĞI
+        document.getElementById('leave-btn').onclick = () => {
+            location.reload(); // En temiz yöntem sayfayı yenilemek ve peer'ı yok etmektir
+        };
+
+        socket.on('signal', data => {
+            if (!peer) {
+                statusText.innerText = "Yayın alınıyor...";
+                
+                peer = new SimplePeer({
+                    initiator: false,
+                    trickle: false,
+                    config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+                });
+
+                peer.on('signal', signal => {
+                    socket.emit('signal', { 
+                        roomId: currentRoomId, 
+                        signal, 
+                        targetId: data.senderId 
+                    });
+                });
+
+                peer.on('stream', stream => {
+                    statusText.innerText = "Yayıncı: " + currentRoomId;
+                    const video = document.getElementById('remote-video');
+                    video.srcObject = stream;
+                    video.play();
+                });
+
+                peer.on('error', err => {
+                    console.error(err);
+                    statusText.innerText = "Hata oluştu!";
+                });
+            }
+            peer.signal(data.signal);
+        });
+
+        socket.on('connect', () => console.log("Bağlı"));
+    </script>
+</body>
+</html>

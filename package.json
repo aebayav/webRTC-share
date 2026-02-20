@@ -1,0 +1,22 @@
+{
+  "name": "webrtc-share",
+  "version": "1.0.0",
+  "description": "a webRTC screen sharer",
+  "license": "ISC",
+  "author": "aebayav",
+  "type": "commonjs",
+  "main": "app/main.js",
+  "scripts": {
+    "start": "electron .",
+    "server": "node server/server.js",
+    "dev": "concurrently \"npm run server\" \"npm start\"",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "dependencies": {
+    "concurrently": "^9.2.1",
+    "electron": "^40.0.0",
+    "simple-peer": "^9.11.1",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
+  }
+}
